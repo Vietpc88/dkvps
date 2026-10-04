@@ -1,0 +1,10 @@
+*.pem
+*.key
+oci_config
+config
+.env
+.env.*
+id_rsa
+id_ed25519
+__pycache__/
+*.pyc
