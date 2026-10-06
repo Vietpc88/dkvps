@@ -101,6 +101,11 @@ if [[ -z "$id" ]]; then
       output result capacity
       exit 0
     fi
+    if grep -Eiq 'TooManyRequests|429' "$combine"; then
+      echo 'Oracle tạm thời giới hạn tần suất API (429 TooManyRequests). Sẽ tự động thử lại ở chu kỳ kế tiếp.'
+      output result capacity
+      exit 0
+    fi
     echo "--- CHI TIẾT PHẢN HỒI TỪ ORACLE OCI ---" >&2
     cat "$combine" >&2
     echo "--------------------------------------" >&2
