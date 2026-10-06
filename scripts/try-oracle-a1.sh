@@ -94,13 +94,17 @@ if [[ -z "$id" ]]; then
     [[ -n "$id" ]] || fail 'Launch không trả Instance OCID; kiểm tra Console trước khi chạy lại'
     result=created
   else
-    if grep -Eiq 'out of (host )?capacity|insufficient capacity|capacity unavailable|host capacity' "$tmp/error"; then
-      echo 'A1 vẫn đang hết capacity. Sẽ thử lại ở lần chạy kế tiếp.'
+    combine="$tmp/error_all"
+    cat "$tmp/error" "$tmp/launch.json" > "$combine" 2>/dev/null || true
+    if grep -Eiq 'out of (host )?capacity|insufficient capacity|capacity unavailable|host capacity|out of capacity' "$combine"; then
+      echo 'A1 vẫn đang hết host capacity (Oracle chưa có tài nguyên trống). Sẽ tự động thử lại ở chu kỳ kế tiếp.'
       output result capacity
       exit 0
     fi
-    cat "$tmp/error" >&2
-    fail 'Launch thất bại; nếu lỗi mạng, kiểm tra Console trước khi chạy lại'
+    echo "--- CHI TIẾT PHẢN HỒI TỪ ORACLE OCI ---" >&2
+    cat "$combine" >&2
+    echo "--------------------------------------" >&2
+    fail 'Launch thất bại; xem chi tiết lỗi bên trên.'
   fi
 fi
 output instance_id "$id"
