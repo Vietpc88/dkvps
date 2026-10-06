@@ -9,11 +9,46 @@ for cmd in oci jq ssh-keygen sha256sum; do command -v "$cmd" >/dev/null || fail 
 for var in OCI_CLI_USER OCI_CLI_TENANCY OCI_CLI_FINGERPRINT OCI_CLI_KEY_CONTENT OCI_CLI_REGION OCI_SUBNET_OCID OCI_SSH_PUBLIC_KEY; do
   [[ -n "${!var:-}" ]] || fail "Thiếu biến $var"
 done
+OCI_CLI_USER="${OCI_CLI_USER#*user=}"
+OCI_CLI_USER="${OCI_CLI_USER#*user:}"
 OCI_CLI_USER="$(echo -n "$OCI_CLI_USER" | tr -d '[:space:]"'\''')"
+
+OCI_CLI_TENANCY="${OCI_CLI_TENANCY#*tenancy=}"
+OCI_CLI_TENANCY="${OCI_CLI_TENANCY#*tenancy:}"
 OCI_CLI_TENANCY="$(echo -n "$OCI_CLI_TENANCY" | tr -d '[:space:]"'\''')"
+
+OCI_CLI_FINGERPRINT="${OCI_CLI_FINGERPRINT#*fingerprint=}"
+OCI_CLI_FINGERPRINT="${OCI_CLI_FINGERPRINT#*fingerprint:}"
 OCI_CLI_FINGERPRINT="$(echo -n "$OCI_CLI_FINGERPRINT" | tr -d '[:space:]"'\''')"
+
 OCI_CLI_REGION="$(echo -n "$OCI_CLI_REGION" | tr -d '[:space:]"'\''')"
+
+OCI_SUBNET_OCID="${OCI_SUBNET_OCID#*subnet=}"
+OCI_SUBNET_OCID="${OCI_SUBNET_OCID#*subnet:}"
+OCI_SUBNET_OCID="${OCI_SUBNET_OCID#*vcn=}"
+OCI_SUBNET_OCID="${OCI_SUBNET_OCID#*vcn:}"
 OCI_SUBNET_OCID="$(echo -n "$OCI_SUBNET_OCID" | tr -d '[:space:]"'\''')"
+
+if [[ ! "$OCI_CLI_FINGERPRINT" =~ ^([[:xdigit:]]{2}:){15}[[:xdigit:]]{2}$ ]]; then
+  echo "Fingerprint từ secret không khớp định dạng hex 16 cặp. Đang tự động trích xuất fingerprint từ OCI Private Key..."
+  derived_fp="$(python3 -c "
+import hashlib, sys
+from cryptography.hazmat.primitives import serialization
+try:
+    k = serialization.load_pem_private_key(sys.stdin.read().encode(), password=None)
+    der = k.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    d = hashlib.md5(der).hexdigest()
+    print(':'.join(d[i:i+2] for i in range(0, 32, 2)))
+except Exception:
+    pass
+" <<< "$OCI_CLI_KEY_CONTENT")"
+  if [[ "$derived_fp" =~ ^([[:xdigit:]]{2}:){15}[[:xdigit:]]{2}$ ]]; then
+    echo "Đã tự động tính toán Fingerprint thành công từ Private Key!"
+    OCI_CLI_FINGERPRINT="$derived_fp"
+  fi
+fi
+
+export OCI_CLI_USER OCI_CLI_TENANCY OCI_CLI_FINGERPRINT OCI_CLI_REGION OCI_SUBNET_OCID
 
 [[ "$OCI_CLI_REGION" == ap-singapore-2 ]] || fail 'Chỉ cho phép ap-singapore-2'
 [[ "$OCI_CLI_USER" == ocid1.user.* ]] || fail 'User OCID không hợp lệ'
