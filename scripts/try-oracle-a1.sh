@@ -89,7 +89,7 @@ if [[ -z "$id" ]]; then
     --shape "$shape" --shape-config "{\"ocpus\":$ocpus,\"memoryInGBs\":$memory}" \
     --image-id "$image" --subnet-id "$OCI_SUBNET_OCID" --display-name "$name" \
     --ssh-authorized-keys-file "$tmp/ssh.pub" --assign-public-ip true \
-    --opc-retry-token "$token" > "$tmp/launch.json" 2> "$tmp/error"; then
+    > "$tmp/launch.json" 2> "$tmp/error"; then
     id="$(jq -r '.data.id // empty' "$tmp/launch.json")"
     [[ -n "$id" ]] || fail 'Launch không trả Instance OCID; kiểm tra Console trước khi chạy lại'
     result=created
