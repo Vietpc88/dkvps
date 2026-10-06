@@ -1,6 +1,10 @@
 # Oracle A1 Auto Provision
 
-GitHub Actions thử tạo VPS mỗi giờ ở phút 17 UTC (phút 17 theo giờ Việt Nam). GitHub có thể chạy trễ hoặc bỏ lượt khi hệ thống bận. Chỉ dùng `ap-singapore-2`, `VM.Standard.A1.Flex`, **2 OCPU / 12 GB RAM**, Ubuntu 24.04 ARM64 non-Minimal, Public IPv4, tên `oracle-free-a1` và SSH user `ubuntu`.
+## Cấu hình chạy tự động hiện tại
+
+Theo yêu cầu mới nhất, cấu hình mục tiêu là **2 OCPU / 12 GB RAM / 2 Gbps**, VM.Standard.A1.Flex, Singapore West và Ubuntu 24.04 ARM64.
+
+GitHub Actions tự động thử tạo VPS mỗi **15 phút** (`*/15 * * * *`). Chỉ dùng `ap-singapore-2`, `VM.Standard.A1.Flex`, **2 OCPU / 12 GB RAM**, Ubuntu 24.04 ARM64 non-Minimal, Public IPv4, tên `oracle-free-a1` và SSH user `ubuntu`.
 
 Project không nâng tài khoản lên PAYG, không tạo VCN/subnet riêng, không đổi shape hoặc CPU/RAM. VM sẽ có boot volume và VNIC do OCI tạo kèm; kiểm tra hạn mức miễn phí hiện có trên tài khoản trước khi chạy. Cấu hình nhỏ không tự chứng minh toàn bộ tài khoản còn trong hạn mức miễn phí. Không chạy nhiều bản sao workflow ở nhiều repository hoặc tự tạo VM cùng tên trong khi workflow đang chạy.
 

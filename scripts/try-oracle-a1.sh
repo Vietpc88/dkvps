@@ -9,10 +9,16 @@ for cmd in oci jq ssh-keygen sha256sum; do command -v "$cmd" >/dev/null || fail 
 for var in OCI_CLI_USER OCI_CLI_TENANCY OCI_CLI_FINGERPRINT OCI_CLI_KEY_CONTENT OCI_CLI_REGION OCI_SUBNET_OCID OCI_SSH_PUBLIC_KEY; do
   [[ -n "${!var:-}" ]] || fail "Thiếu biến $var"
 done
+OCI_CLI_USER="$(echo -n "$OCI_CLI_USER" | tr -d '[:space:]"'\''')"
+OCI_CLI_TENANCY="$(echo -n "$OCI_CLI_TENANCY" | tr -d '[:space:]"'\''')"
+OCI_CLI_FINGERPRINT="$(echo -n "$OCI_CLI_FINGERPRINT" | tr -d '[:space:]"'\''')"
+OCI_CLI_REGION="$(echo -n "$OCI_CLI_REGION" | tr -d '[:space:]"'\''')"
+OCI_SUBNET_OCID="$(echo -n "$OCI_SUBNET_OCID" | tr -d '[:space:]"'\''')"
+
 [[ "$OCI_CLI_REGION" == ap-singapore-2 ]] || fail 'Chỉ cho phép ap-singapore-2'
 [[ "$OCI_CLI_USER" == ocid1.user.* ]] || fail 'User OCID không hợp lệ'
 [[ "$OCI_CLI_TENANCY" == ocid1.tenancy.* ]] || fail 'Tenancy OCID không hợp lệ'
-[[ "$OCI_SUBNET_OCID" == ocid1.subnet.* ]] || fail 'Subnet OCID không hợp lệ'
+[[ "$OCI_SUBNET_OCID" == ocid1.subnet.* || "$OCI_SUBNET_OCID" == ocid1.vcn.* ]] || fail 'Subnet OCID không hợp lệ'
 [[ "$OCI_CLI_FINGERPRINT" =~ ^([[:xdigit:]]{2}:){15}[[:xdigit:]]{2}$ ]] || fail 'Fingerprint không hợp lệ'
 [[ "$OCI_CLI_KEY_CONTENT" == *'PRIVATE KEY-----'* ]] || fail 'API key phải là PEM private key'
 readonly shape='VM.Standard.A1.Flex' ocpus=2 memory=12 name='oracle-free-a1'
@@ -28,6 +34,12 @@ cli compute instance list --compartment-id "$compartment" --display-name "$name"
 id="$(jq -r --arg name "$name" '[.data[] | select(."display-name" == $name and ."lifecycle-state" != "TERMINATED" and ."lifecycle-state" != "TERMINATING")][0].id // empty' "$tmp/instances.json")"
 result=exists
 if [[ -z "$id" ]]; then
+  if [[ "$OCI_SUBNET_OCID" == ocid1.vcn.* ]]; then
+    echo "Phát hiện VCN OCID, đang tự động tìm public subnet trong VCN..."
+    subnet_id="$(cli network subnet list --compartment-id "$compartment" --vcn-id "$OCI_SUBNET_OCID" --all | jq -r '[.data[] | select(.["prohibit-public-ip-on-vnic"] == false and .["lifecycle-state"] == "AVAILABLE")][0].id // empty')"
+    [[ -n "$subnet_id" ]] || fail 'Không tìm thấy public subnet AVAILABLE nào trong VCN này'
+    OCI_SUBNET_OCID="$subnet_id"
+  fi
   cli network subnet get --subnet-id "$OCI_SUBNET_OCID" > "$tmp/subnet.json"
   [[ "$(jq -r '.data."prohibit-public-ip-on-vnic"' "$tmp/subnet.json")" == false ]] || fail 'Subnet không cho phép Public IPv4'
   cli compute image list --compartment-id "$compartment" --operating-system 'Canonical Ubuntu' --operating-system-version '24.04' --shape "$shape" --all > "$tmp/images.json"

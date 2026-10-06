@@ -2,7 +2,7 @@ name: Oracle A1 Auto Provision
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 * * * *'
+    - cron: '*/15 * * * *'
 permissions:
   contents: read
   actions: write
