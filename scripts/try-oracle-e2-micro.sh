@@ -104,7 +104,7 @@ if [[ -z "$id" ]]; then
 
   echo "Kiểm tra danh sách region của tài khoản..."
   cli iam region-subscription list --tenancy-id "$OCI_CLI_TENANCY" > "$tmp/regions.json"
-  echo "Các region đã đăng ký: $(jq -r '.data[].region-name' "$tmp/regions.json" | tr '\n' ' ')"
+  echo "Các region đã đăng ký: $(jq -r '.data[]."region-name" // empty' "$tmp/regions.json" | tr '\n' ' ')"
 
   echo "Kiểm tra shape $shape trong AD..."
   cli compute shape list --compartment-id "$compartment" --availability-domain "$ad" > "$tmp/shapes.json"
