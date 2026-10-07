@@ -2,9 +2,11 @@
 
 ## Cấu hình chạy tự động hiện tại
 
-Theo yêu cầu mới nhất, cấu hình mục tiêu là **2 OCPU / 12 GB RAM / 2 Gbps**, VM.Standard.A1.Flex, Singapore West và Ubuntu 24.04 ARM64.
+Dự án hỗ trợ 2 cấu hình Always Free của Oracle Cloud tại Singapore West (`ap-singapore-2`):
+1. **VM.Standard.A1.Flex** (ARM64 Ampere): **2 OCPU / 12 GB RAM / 2 Gbps**, Ubuntu 24.04 ARM64, tên `oracle-free-a1`. Workflow: `oracle-a1-auto.yml`.
+2. **VM.Standard.E2.1.Micro** (AMD x86_64): **1 OCPU AMD / 1 GB RAM**, Ubuntu 24.04 x86_64, tên `oracle-free-e2-micro`. Workflow: `oracle-e2-micro-auto.yml`.
 
-GitHub Actions tự động thử tạo VPS mỗi **15 phút** (`*/15 * * * *`). Chỉ dùng `ap-singapore-2`, `VM.Standard.A1.Flex`, **2 OCPU / 12 GB RAM**, Ubuntu 24.04 ARM64 non-Minimal, Public IPv4, tên `oracle-free-a1` và SSH user `ubuntu`.
+Cả hai cấu hình đều chạy tự động mỗi **15 phút** (`*/15 * * * *`) trên GitHub Actions hoặc qua tiến trình điều phối ngầm `scripts/auto-dispatch-15m.py`. Public IPv4, SSH user `ubuntu`.
 
 Project không nâng tài khoản lên PAYG, không tạo VCN/subnet riêng, không đổi shape hoặc CPU/RAM. VM sẽ có boot volume và VNIC do OCI tạo kèm; kiểm tra hạn mức miễn phí hiện có trên tài khoản trước khi chạy. Cấu hình nhỏ không tự chứng minh toàn bộ tài khoản còn trong hạn mức miễn phí. Không chạy nhiều bản sao workflow ở nhiều repository hoặc tự tạo VM cùng tên trong khi workflow đang chạy.
 

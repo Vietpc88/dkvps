@@ -1,0 +1,58 @@
+name: Oracle E2.1.Micro Auto Provision
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+permissions:
+  contents: read
+  actions: write
+  issues: write
+concurrency:
+  group: oracle-e2-micro-auto
+  cancel-in-progress: false
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OCI_CLI_USER: ${{ secrets.OCI_USER_OCID }}
+      OCI_CLI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
+      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+      OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_API_PRIVATE_KEY }}
+      OCI_CLI_REGION: ap-singapore-2
+      OCI_SUBNET_OCID: ${{ secrets.OCI_SUBNET_OCID }}
+      OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
+      OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OCI CLI
+        run: |
+          python3 -m venv "$RUNNER_TEMP/oci-venv"
+          "$RUNNER_TEMP/oci-venv/bin/pip" install 'oci-cli==3.94.1'
+          echo "$RUNNER_TEMP/oci-venv/bin" >> "$GITHUB_PATH"
+      - name: Try E2 Micro
+        id: e2
+        run: bash scripts/try-oracle-e2-micro.sh
+      - name: Notify success
+        if: steps.e2.outputs.result == 'created'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTANCE_ID: ${{ steps.e2.outputs.instance_id }}
+          PUBLIC_IP: ${{ steps.e2.outputs.public_ip }}
+        run: |
+          body="$RUNNER_TEMP/oracle-e2-issue.md"
+          printf '%s\n' \
+            'Instance name: oracle-free-e2-micro' \
+            'Region: ap-singapore-2' \
+            'Shape: VM.Standard.E2.1.Micro' \
+            'CPU: 1 OCPU AMD' 'RAM: 1 GB' \
+            "Instance OCID: $INSTANCE_ID" "Public IP: ${PUBLIC_IP:-Chưa lấy được}" \
+            'Vào OCI Console → Singapore West → Compute → Instances để kiểm tra trạng thái và kết nối ubuntu.' > "$body"
+          gh issue create --repo "$GITHUB_REPOSITORY" --title '✅ Oracle E2.1.Micro đã tạo thành công' --body-file "$body"
+      - name: Disable scheduled workflow
+        if: always() && (steps.e2.outputs.result == 'created' || steps.e2.outputs.result == 'exists')
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/oracle-e2-micro-auto.yml/disable"
