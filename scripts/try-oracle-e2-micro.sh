@@ -99,8 +99,19 @@ if [[ -z "$id" ]]; then
   ad="$(jq -r '.data[0].name // empty' "$tmp/ads.json")"
   [[ -n "$ad" ]] || fail 'Không tìm thấy Availability Domain'
 
+  echo "AD: $ad"
+  echo "Image: $image"
+
+  echo "Kiểm tra shape $shape trong AD..."
+  cli compute shape list --compartment-id "$compartment" --availability-domain "$ad" > "$tmp/shapes.json"
+  matched_shape="$(jq -r --arg s "$shape" '.data[] | select(.shape == $s).shape' "$tmp/shapes.json")"
+  if [[ -z "$matched_shape" ]]; then
+    echo "Cảnh báo: Shape $shape không có trong danh sách shape của AD $ad."
+    echo "Các shape micro/free có sẵn:"
+    jq -r '.data[].shape' "$tmp/shapes.json" | grep -iE 'micro|e2|a1' || true
+  fi
+
   echo "Đang thử tạo E2.1.Micro (1 OCPU AMD / 1 GB RAM)..."
-  # VM.Standard.E2.1.Micro is a fixed shape, so DO NOT pass --shape-config
   if cli compute instance launch --availability-domain "$ad" --compartment-id "$compartment" \
     --shape "$shape" \
     --image-id "$image" --subnet-id "$OCI_SUBNET_OCID" --display-name "$name" \
