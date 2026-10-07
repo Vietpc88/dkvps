@@ -80,15 +80,20 @@ if [[ -z "$id" ]]; then
   cli network subnet get --subnet-id "$OCI_SUBNET_OCID" > "$tmp/subnet.json"
   [[ "$(jq -r '.data."prohibit-public-ip-on-vnic"' "$tmp/subnet.json")" == false ]] || fail 'Subnet không cho phép Public IPv4'
 
-  # Find eligible Ubuntu x86_64 image compatible with VM.Standard.E2.1.Micro
+  # Find eligible Ubuntu image compatible with VM.Standard.E2.1.Micro
   cli compute image list --compartment-id "$compartment" --operating-system 'Canonical Ubuntu' --operating-system-version '24.04' --shape "$shape" --all > "$tmp/images.json"
-  image="$(jq -r '[.data[] | select(."lifecycle-state" == "AVAILABLE") | select(."display-name" | test("minimal"; "i") | not) | select(."display-name" | test("x86_64|amd64"; "i"))] | sort_by(."time-created") | last | .id // empty' "$tmp/images.json")"
+  image="$(jq -r '[.data[] | select(."lifecycle-state" == "AVAILABLE") | select(."display-name" | test("minimal"; "i") | not) | select(."display-name" | test("aarch64|arm64"; "i") | not)] | sort_by(."time-created") | last | .id // empty' "$tmp/images.json")"
   if [[ -z "$image" ]]; then
-    echo "Không tìm thấy image Ubuntu 24.04 x86_64, đang kiểm tra tất cả phiên bản Ubuntu tương thích..."
+    echo "Không tìm thấy image Ubuntu 24.04, đang kiểm tra các phiên bản Canonical Ubuntu khác..."
     cli compute image list --compartment-id "$compartment" --operating-system 'Canonical Ubuntu' --shape "$shape" --all > "$tmp/images.json"
-    image="$(jq -r '[.data[] | select(."lifecycle-state" == "AVAILABLE") | select(."display-name" | test("minimal"; "i") | not) | select(."display-name" | test("x86_64|amd64"; "i"))] | sort_by(."time-created") | last | .id // empty' "$tmp/images.json")"
+    image="$(jq -r '[.data[] | select(."lifecycle-state" == "AVAILABLE") | select(."display-name" | test("minimal"; "i") | not) | select(."display-name" | test("aarch64|arm64"; "i") | not)] | sort_by(."time-created") | last | .id // empty' "$tmp/images.json")"
   fi
-  [[ -n "$image" ]] || fail 'Không tìm thấy image Ubuntu x86_64 AVAILABLE phù hợp cho VM.Standard.E2.1.Micro'
+  if [[ -z "$image" ]]; then
+    echo "Đang tìm kiếm tất cả các image hệ điều hành tương thích với $shape..."
+    cli compute image list --compartment-id "$compartment" --shape "$shape" --all > "$tmp/images.json"
+    image="$(jq -r '[.data[] | select(."lifecycle-state" == "AVAILABLE") | select(."display-name" | test("minimal"; "i") | not) | select(."display-name" | test("aarch64|arm64"; "i") | not)] | sort_by(."time-created") | last | .id // empty' "$tmp/images.json")"
+  fi
+  [[ -n "$image" ]] || fail 'Không tìm thấy image AVAILABLE phù hợp cho VM.Standard.E2.1.Micro'
 
   cli iam availability-domain list --compartment-id "$OCI_CLI_TENANCY" > "$tmp/ads.json"
   ad="$(jq -r '.data[0].name // empty' "$tmp/ads.json")"
