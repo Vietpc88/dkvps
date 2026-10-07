@@ -50,7 +50,7 @@ fi
 
 export OCI_CLI_USER OCI_CLI_TENANCY OCI_CLI_FINGERPRINT OCI_CLI_REGION OCI_SUBNET_OCID
 
-[[ "$OCI_CLI_REGION" == ap-singapore-2 ]] || fail 'Chỉ cho phép ap-singapore-2'
+[[ "$OCI_CLI_REGION" =~ ^[a-z]{2}-[a-z0-9-]+-[0-9]+$ ]] || fail "Region không hợp lệ: $OCI_CLI_REGION"
 [[ "$OCI_CLI_USER" == ocid1.user.* ]] || fail 'User OCID không hợp lệ'
 [[ "$OCI_CLI_TENANCY" == ocid1.tenancy.* ]] || fail 'Tenancy OCID không hợp lệ'
 [[ "$OCI_SUBNET_OCID" == ocid1.subnet.* || "$OCI_SUBNET_OCID" == ocid1.vcn.* ]] || fail 'Subnet OCID không hợp lệ'
@@ -66,7 +66,7 @@ trap 'rm -rf -- "$tmp"' EXIT
 printf '%s\n' "$OCI_SSH_PUBLIC_KEY" > "$tmp/ssh.pub"
 ssh-keygen -l -f "$tmp/ssh.pub" >/dev/null 2>&1 || fail 'SSH public key không hợp lệ'
 
-cli() { oci --region ap-singapore-2 --auth api_key --output json "$@"; }
+cli() { oci --region "$OCI_CLI_REGION" --auth api_key --output json "$@"; }
 cli compute instance list --compartment-id "$compartment" --display-name "$name" --all > "$tmp/instances.json"
 id="$(jq -r --arg name "$name" '[.data[] | select(."display-name" == $name and ."lifecycle-state" != "TERMINATED" and ."lifecycle-state" != "TERMINATING")][0].id // empty' "$tmp/instances.json")"
 result=exists
@@ -102,13 +102,17 @@ if [[ -z "$id" ]]; then
   echo "AD: $ad"
   echo "Image: $image"
 
+  echo "Kiểm tra danh sách region của tài khoản..."
+  cli iam region-subscription list --tenancy-id "$OCI_CLI_TENANCY" > "$tmp/regions.json"
+  echo "Các region đã đăng ký: $(jq -r '.data[].region-name' "$tmp/regions.json" | tr '\n' ' ')"
+
   echo "Kiểm tra shape $shape trong AD..."
   cli compute shape list --compartment-id "$compartment" --availability-domain "$ad" > "$tmp/shapes.json"
   matched_shape="$(jq -r --arg s "$shape" '.data[] | select(.shape == $s).shape' "$tmp/shapes.json")"
   if [[ -z "$matched_shape" ]]; then
-    echo "Cảnh báo: Shape $shape không có trong danh sách shape của AD $ad."
-    echo "Các shape micro/free có sẵn:"
-    jq -r '.data[].shape' "$tmp/shapes.json" | grep -iE 'micro|e2|a1' || true
+    echo "Lỗi: Shape $shape không được Oracle hỗ trợ tại region $OCI_CLI_REGION (AD: $ad)."
+    echo "Tại Singapore West (ap-singapore-2), Oracle chỉ hỗ trợ shape Always Free: VM.Standard.A1.Flex (ARM)."
+    fail "Shape $shape không tồn tại trong region $OCI_CLI_REGION"
   fi
 
   echo "Đang thử tạo E2.1.Micro (1 OCPU AMD / 1 GB RAM)..."
